@@ -56,7 +56,8 @@ function newNewYorkState() {
             if (_lookupTable[i].county == c) {
                 return _lookupTable[i].region;
             } else {
-                console.error("NYS: cannot locate county: " + c);
+                console.log("NYS: unknown county: " + c);
+                return c;
             }
         }
     };
