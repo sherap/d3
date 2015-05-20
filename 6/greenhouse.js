@@ -2,12 +2,11 @@
  * New York State DEC
  * Greenhouse Gas Emissions from Fuel Combustion
  * Million Metric Tons
- * 
- * Work based on Mike Bostock's block #3943967.
  */
-
 var file = "Greenhouse_Gas_Emissions_From_Fuel_Combustion__Million_Metric_Tons__Beginning_1990.csv";
-var margin = {top: 70, right:10, bottom: 20, left: 30};
+
+/* Based on Mike Bostock's block #3943967. */
+var margin = {top: 70, right:10, bottom: 20, left: 34};
 var width = 960 - margin.left - margin.right;
 var height = 600 - margin.top - margin.bottom;
 
@@ -33,7 +32,7 @@ function dataCallback(error, data) {
 
     data.sort(compare);
 
-    // Each series of values over time will count as a 'layer'.
+    // Each series of values over time will be considered a layer.
     var series = [];
     series[0] = data.map(mapResidential);
     series[1] = data.map(mapCommercial);
@@ -41,21 +40,22 @@ function dataCallback(error, data) {
     series[3] = data.map(mapTransportation);
     series[4] = data.map(mapGeneration);
     series[5] = data.map(mapImports);
+
     var stack = d3.layout.stack();
     var layers = stack(series);
     var layerCount = series.length;
 
-    var yGroupMax = d3.max(layers, function(layer) {
-        return d3.max(layer, function(d) { return d.y; });
-    });
-
-    var yStackMax = d3.max(layers, function(layer) {
-        return d3.max(layer, function(d) { return d.y0 + d.y; });
-    });
-
     var xScale = d3.scale.ordinal()
         .domain(data.map(mapYear))
         .rangeRoundBands([0, width], 0.08);
+/*
+    var yGroupMax = d3.max(layers, function(layer) {
+        return d3.max(layer, function(d) { return d.y; });
+    });
+*/
+    var yStackMax = d3.max(layers, function(layer) {
+        return d3.max(layer, function(d) { return d.y0 + d.y; });
+    });
 
     var yScale = d3.scale.linear()
         .domain([0, yStackMax])
@@ -71,52 +71,25 @@ function dataCallback(error, data) {
         .tickPadding(6)
         .orient("bottom");
 
-     /* tickSize: tick mark length (inner), and axis-terminating (outer) tick mark length.
-        Setting outerTickSize to nonzero creates an area within a path element which can be filled.
-      */
     var yAxis = d3.svg.axis()
         .scale(yScale)
         .tickSize(8, 0)
         .tickPadding(6)
         .orient("left");
 
-    // modify the document
+    var tip = d3.tip()
+        .attr("class", "d3-tip")
+        .html(function(d) { return "<span>" + d.attribution + "</span>: " + d.y; })
+        .offset([-10, 0]);
+
+    // Document structure
     var svg = d3.select("#chart")
         .attr("width", width + margin.left + margin.right)
         .attr("height", height + margin.top + margin.bottom)
         .append("svg:g")
         .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-    var layer = svg.selectAll(".layer")
-        .data(layers)
-        .enter().append("svg:g")
-        .attr("class", "layer")
-        .style("fill", function(d, i) { return color(i); });
-
-    var rect = layer.selectAll("rect")
-        .data(function(d) { return d; })
-        .enter().append("rect")
-        .attr("x", function(d) { return xScale(d.x); })
-        .attr("y", height) 
-        .attr("width", xScale.rangeBand())
-        .attr("height", 0);
-
-    // On transition, reset y and height attributes of the data rectangle
-    rect.transition()
-        .delay(function(d, i) { return i * 10; })
-        .attr("y", function(d) { return yScale(d.y0 + d.y); })
-        .attr("height", function(d) { return yScale(d.y0) - yScale(d.y0 + d.y); });
-
-
-    svg.append("svg:g")
-        .attr("class", "x axis")
-        .attr("transform", "translate(0, " + height + ")")
-        .call(xAxis);
-
-    svg.append("svg:g")
-        .attr("class", "y axis")
-        .call(yAxis);
-
+    // Title
     svg.append("text")
         .attr("class", "title")
         .attr("dx", "1em")
@@ -128,6 +101,45 @@ function dataCallback(error, data) {
         .attr("dx", "3em")
         .attr("dy", "-.5em")
         .text("million metric tons");
+
+    // Axis
+    svg.append("svg:g")
+        .attr("class", "x axis")
+        .attr("transform", "translate(0, " + height + ")")
+        .call(xAxis);
+
+    svg.append("svg:g")
+        .attr("class", "y axis")
+        .call(yAxis);
+
+    // Tooltips
+    svg.call(tip);
+
+    // .layer
+    var layer = svg.selectAll(".layer")
+        .data(layers)
+        .enter().append("svg:g")
+        .attr("class", "layer")
+        .style("fill", function(d, i) { return color(i); });
+
+    // .layer rect
+    var rect = layer.selectAll("rect")
+        .data(function(d) { return d; })
+        .enter().append("rect")
+        .attr("x", function(d) { return xScale(d.x); })
+        .attr("y", height) 
+        .attr("width", xScale.rangeBand())
+        .attr("height", 0)
+        .on("mouseover", tip.show)
+        .on("mouseout", tip.hide);
+
+    // On transition, reset y and height attributes of the data rectangle
+    rect.transition()
+        .delay(function(d, i) { return i * 10; })
+        .attr("y", function(d) { return yScale(d.y0 + d.y); })
+        .attr("height", function(d) {
+            return yScale(d.y0) - yScale(d.y0 + d.y); 
+        });
 }
 
 
@@ -144,25 +156,43 @@ function mapYear(element, index) {
 }
 
 function mapResidential(element) {
-    return {x: element.year, y: element.residential};
+    return {x: element.year, 
+            y: element.residential,
+            y0: 0,
+            attribution: "Residential" };
 }
 
 function mapCommercial(element) {
-    return {x: element.year, y: element.commercial};
+    return {x: element.year, 
+            y: element.commercial,
+            y0: 0,
+            attribution: "Commercial" };
 }
 
 function mapIndustrial(element) {
-    return {x: element.year, y: element.industrial};
+    return {x: element.year, 
+            y: element.industrial, 
+            y0: 0,
+            attribution: "Industrial" };
 }
 
 function mapTransportation(element) {
-    return {x: element.year, y: element.transportation};
+    return {x: element.year,
+            y: element.transportation,
+            y0: 0,
+            attribution: "Transportation" };
 }
 
 function mapGeneration(element) {
-    return {x: element.year, y: element.generation};
+    return {x: element.year, 
+            y: element.generation,
+            y0: 0,
+            attribution: "Power Generation" };
 }
 
 function mapImports(element) {
-    return {x: element.year, y: element.imports};
+    return {x: element.year, 
+            y: element.imports,
+            y0: 0,
+            attribution: "Imports" };
 }
